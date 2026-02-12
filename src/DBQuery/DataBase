@@ -1,0 +1,155 @@
+DROP DATABASE IF EXISTS sams_db;
+CREATE DATABASE sams_db;
+USE sams_db;
+
+CREATE TABLE students (
+    student_id INT PRIMARY KEY AUTO_INCREMENT,
+    student_number VARCHAR(20) UNIQUE NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(15),
+    date_of_birth DATE,
+    enrollment_date DATE NOT NULL,
+    status ENUM('Active', 'Inactive', 'Graduated') DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lecturers (
+    lecturer_id INT PRIMARY KEY AUTO_INCREMENT,
+    lecturer_number VARCHAR(20) UNIQUE NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(15),
+    department VARCHAR(50),
+    qualification VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE courses (
+    course_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_code VARCHAR(20) UNIQUE NOT NULL,
+    course_name VARCHAR(100) NOT NULL,
+    credits INT NOT NULL,
+    semester VARCHAR(20),
+    lecturer_id INT,
+    capacity INT DEFAULT 50,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lecturer_id) REFERENCES lecturers(lecturer_id) ON DELETE SET NULL
+);
+
+CREATE TABLE enrollments (
+    enrollment_id INT PRIMARY KEY AUTO_INCREMENT,
+    student_id INT NOT NULL,
+    course_id INT NOT NULL,
+    enrollment_date DATE NOT NULL,
+    status ENUM('Enrolled', 'Completed', 'Dropped') DEFAULT 'Enrolled',
+    grade VARCHAR(5),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_enrollment (student_id, course_id)
+);
+
+CREATE TABLE attendance (
+    attendance_id INT PRIMARY KEY AUTO_INCREMENT,
+    enrollment_id INT NOT NULL,
+    attendance_date DATE NOT NULL,
+    status ENUM('Present', 'Absent', 'Late') NOT NULL,
+    remarks TEXT,
+    FOREIGN KEY (enrollment_id) REFERENCES enrollments(enrollment_id) ON DELETE CASCADE
+);
+
+CREATE TABLE assessments (
+    assessment_id INT PRIMARY KEY AUTO_INCREMENT,
+    enrollment_id INT NOT NULL,
+    assessment_type ENUM('Quiz', 'Assignment', 'Midterm', 'Final') NOT NULL,
+    marks_obtained DECIMAL(5,2),
+    total_marks DECIMAL(5,2) NOT NULL,
+    assessment_date DATE,
+    remarks TEXT,
+    FOREIGN KEY (enrollment_id) REFERENCES enrollments(enrollment_id) ON DELETE CASCADE
+);
+
+CREATE VIEW student_course_details AS
+SELECT 
+    s.student_id,
+    s.student_number,
+    CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+    s.email AS student_email,
+    c.course_id,
+    c.course_code,
+    c.course_name,
+    c.credits,
+    CONCAT(l.first_name, ' ', l.last_name) AS lecturer_name,
+    e.enrollment_id,
+    e.enrollment_date,
+    e.status AS enrollment_status,
+    e.grade
+FROM students s
+JOIN enrollments e ON s.student_id = e.student_id
+JOIN courses c ON e.course_id = c.course_id
+LEFT JOIN lecturers l ON c.lecturer_id = l.lecturer_id;
+
+CREATE VIEW course_enrollment_summary AS
+SELECT 
+    c.course_id,
+    c.course_code,
+    c.course_name,
+    c.credits,
+    CONCAT(l.first_name, ' ', l.last_name) AS lecturer_name,
+    l.department,
+    COUNT(e.enrollment_id) AS total_students,
+    c.capacity,
+    (c.capacity - COUNT(e.enrollment_id)) AS available_seats
+FROM courses c
+LEFT JOIN lecturers l ON c.lecturer_id = l.lecturer_id
+LEFT JOIN enrollments e ON c.course_id = e.course_id AND e.status = 'Enrolled'
+GROUP BY c.course_id, c.course_code, c.course_name, c.credits, 
+         l.first_name, l.last_name, l.department, c.capacity;
+
+INSERT INTO lecturers (lecturer_number, first_name, last_name, email, phone, department, qualification) VALUES
+('LEC001', 'John', 'Smith', 'john.smith@university.edu', '0771234567', 'Computer Science', 'PhD in Computer Science'),
+('LEC002', 'Sarah', 'Johnson', 'sarah.johnson@university.edu', '0772234567', 'Mathematics', 'MSc in Mathematics'),
+('LEC003', 'Michael', 'Brown', 'michael.brown@university.edu', '0773234567', 'Computer Science', 'PhD in Software Engineering'),
+('LEC004', 'Emily', 'Davis', 'emily.davis@university.edu', '0774234567', 'Business', 'MBA');
+
+INSERT INTO courses (course_code, course_name, credits, semester, lecturer_id, capacity, description) VALUES
+('CS101', 'Introduction to Programming', 3, 'Semester 1', 1, 50, 'Fundamentals of programming using Java'),
+('CS201', 'Data Structures', 4, 'Semester 2', 3, 40, 'Advanced data structures and algorithms'),
+('MATH101', 'Calculus I', 3, 'Semester 1', 2, 45, 'Differential and integral calculus'),
+('CS301', 'Database Systems', 4, 'Semester 3', 1, 35, 'Relational database design and SQL'),
+('BUS101', 'Business Management', 3, 'Semester 1', 4, 50, 'Introduction to business principles');
+
+INSERT INTO students (student_number, first_name, last_name, email, phone, date_of_birth, enrollment_date, status) VALUES
+('STU2024001', 'Alice', 'Williams', 'alice.williams@student.edu', '0761234567', '2003-05-15', '2024-01-10', 'Active'),
+('STU2024002', 'Bob', 'Anderson', 'bob.anderson@student.edu', '0762234567', '2003-08-22', '2024-01-10', 'Active'),
+('STU2024003', 'Carol', 'Martinez', 'carol.martinez@student.edu', '0763234567', '2003-03-10', '2024-01-10', 'Active'),
+('STU2024004', 'David', 'Garcia', 'david.garcia@student.edu', '0764234567', '2002-11-30', '2024-01-10', 'Active'),
+('STU2024005', 'Emma', 'Rodriguez', 'emma.rodriguez@student.edu', '0765234567', '2003-07-18', '2024-01-10', 'Active');
+
+INSERT INTO enrollments (student_id, course_id, enrollment_date, status, grade) VALUES
+(1, 1, '2024-01-15', 'Enrolled', NULL),
+(1, 3, '2024-01-15', 'Enrolled', NULL),
+(2, 1, '2024-01-15', 'Enrolled', NULL),
+(2, 2, '2024-01-15', 'Enrolled', NULL),
+(3, 1, '2024-01-15', 'Enrolled', NULL),
+(3, 5, '2024-01-15', 'Enrolled', NULL),
+(4, 2, '2024-01-15', 'Enrolled', NULL),
+(4, 4, '2024-01-15', 'Enrolled', NULL),
+(5, 1, '2024-01-15', 'Enrolled', NULL);
+
+INSERT INTO attendance (enrollment_id, attendance_date, status, remarks) VALUES
+(1, '2024-02-01', 'Present', 'On time'),
+(1, '2024-02-08', 'Present', 'On time'),
+(2, '2024-02-01', 'Present', 'On time'),
+(3, '2024-02-01', 'Late', 'Arrived 10 minutes late'),
+(4, '2024-02-01', 'Absent', 'Medical leave');
+
+INSERT INTO assessments (enrollment_id, assessment_type, marks_obtained, total_marks, assessment_date, remarks) VALUES
+(1, 'Quiz', 18.5, 20, '2024-02-10', 'Good performance'),
+(1, 'Assignment', 45, 50, '2024-02-20', 'Excellent work'),
+(2, 'Quiz', 16, 20, '2024-02-10', 'Average'),
+(3, 'Quiz', 19, 20, '2024-02-10', 'Excellent'),
+(4, 'Midterm', 68, 100, '2024-03-15', 'Good understanding');
